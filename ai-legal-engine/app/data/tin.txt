@@ -1,0 +1,302 @@
+import json
+import re
+from typing import List, Tuple
+import logging
+import os
+
+from app.services.gemini_service_v2 import get_gemini_service
+from app.models.schemas import (
+    RiskLevel, ComplianceGap, ComplianceFix, 
+    LegalReference, PolicyAnalysisRequest
+)
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class LegalAnalyzer:
+    """Analyzes legal compliance using AI"""
+    
+    def __init__(self):
+        self.gemini = get_gemini_service()
+        self.ndpr_knowledge = self._load_ndpr_knowledge()
+    
+    def _load_ndpr_knowledge(self) -> str:
+        """
+        Load NDPR full text from file
+        Falls back to a summary if file is missing or loading fails
+        """
+        file_path = os.path.join("app", "data", "ndpr_full_text.txt")
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    logger.info(f"✅ Loaded NDPR knowledge ({len(content)} characters)")
+                    return content
+            else:
+                logger.warning(f"⚠️ NDPR file not found at {file_path}, using fallback")
+                return self._get_fallback_ndpr()
+        except Exception as e:
+            logger.error(f"❌ Failed to load NDPR file: {e}")
+            return self._get_fallback_ndpr()
+    
+    def _get_fallback_ndpr(self) -> str:
+        """Fallback NDPR knowledge text if file not found"""
+        return """
+        NDPR (Nigeria Data Protection Regulation) Key Articles:
+        
+        Article 2.1 - Lawfulness and Consent
+        Personal data must be collected with consent. Consent must be freely given, 
+        specific, informed and unambiguous.
+        
+        Article 2.2 - Purpose Limitation
+        Data collected for specified, explicit and legitimate purposes.
+        
+        Article 2.3 - Data Minimization
+        Data collected must be adequate, relevant and limited to what is necessary.
+        
+        Article 2.5 - Rights of Data Subjects
+        Right to access, rectification, erasure, restriction, portability.
+        
+        Article 3.1 - Security of Processing
+        Appropriate technical and organizational measures required.
+        
+        Article 4.1 - Data Breach Notification
+        Must notify NITDA within 72 hours of breach.
+        """
+    
+    async def analyze_policy(
+        self, 
+        request: PolicyAnalysisRequest
+    ) -> Tuple[int, RiskLevel, List[ComplianceGap], List[ComplianceFix], str, List[LegalReference]]:
+        """
+        Analyze a privacy policy for NDPR compliance.
+        Returns tuple: score, risk level, gap list, fixes list, summary, references.
+        """
+        logger.info(f"Analyzing policy for {request.company_name}")
+        
+        # Construct AI prompt for generating legal analysis
+        prompt = f"""
+You are an expert Nigerian data protection lawyer specializing in NDPR compliance.
+
+TASK: Analyze this privacy policy for NDPR compliance violations.
+
+COMPANY: {request.company_name}
+INDUSTRY: {request.industry or 'Unknown'}
+DOCUMENT TYPE: {request.document_type.value}
+
+POLICY TEXT:
+{request.document_text[:5000]}  
+
+NDPR REQUIREMENTS:
+{self.ndpr_knowledge}
+
+ANALYSIS INSTRUCTIONS:
+1. Identify ALL NDPR compliance gaps
+2. Rate severity: LOW, MEDIUM, HIGH, or CRITICAL
+3. For each gap:
+   - Explain what's missing
+   - Which NDPR article is violated
+   - Business impact
+   - Specific recommendation
+
+4. Calculate overall compliance score (0-100):
+   - 90-100: Excellent (minor improvements)
+   - 70-89: Good (some gaps)
+   - 50-69: Poor (major gaps)
+   - 0-49: Critical (severe violations)
+
+FORMAT YOUR RESPONSE AS JSON:
+{{
+  "compliance_score": 75,
+  "risk_level": "medium",
+  "gaps": [
+    {{
+      "title": "Missing Explicit Consent Language",
+      "description": "Policy does not clearly state that consent can be withdrawn",
+      "severity": "high",
+      "ndpr_articles": ["2.1", "2.5"],
+      "impact": "Users cannot exercise their right to withdraw consent, violation of Article 2.5",
+      "recommendation": "Add clear statement: 'You may withdraw consent at any time by...'"
+    }}
+  ],
+  "summary": "The policy has [X] critical gaps...",
+  "key_issues": ["Issue 1", "Issue 2"]
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+        
+        try:
+            logger.info("Sending prompt to Gemini AI...")
+            response = await self.gemini.generate_text(prompt, temperature=0.2)
+            logger.info(f"Received response ({len(response)} chars)")
+            
+            # Clean AI response, remove markdown if any, then parse JSON
+            json_text = re.sub(r'```json\n?', '', response)
+            json_text = re.sub(r'```\n?', '', json_text)
+            analysis = json.loads(json_text)
+            
+            # Extract compliance score and risk level
+            score = int(analysis.get('compliance_score', 50))
+            risk_level = self._calculate_risk_level(score)
+            
+            # Parse compliance gaps
+            gaps = [
+                ComplianceGap(
+                    gap_id=f"gap_{i}",
+                    title=gap['title'],
+                    description=gap['description'],
+                    severity=RiskLevel(gap['severity'].lower()),
+                    ndpr_articles=gap['ndpr_articles'],
+                    impact=gap['impact'],
+                    recommendation=gap['recommendation']
+                )
+                for i, gap in enumerate(analysis.get('gaps', []))
+            ]
+            
+            # Generate AI fixes for gaps
+            fixes = await self._generate_fixes(gaps, request.document_text)
+            
+            # Get summary and legal references
+            summary = analysis.get('summary', 'Analysis completed')
+            references = self._create_legal_references(gaps)
+            
+            logger.info(f"Analysis complete: Score={score}, Gaps={len(gaps)}")
+            
+            return score, risk_level, gaps, fixes, summary, references
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            logger.error(f"Response preview: {response[:500]}")
+            raise Exception("AI returned invalid JSON format. Please try again.")
+        except Exception as e:
+            logger.error(f"Policy analysis failed: {str(e)}")
+            raise
+    
+    async def _generate_fixes(
+        self, 
+        gaps: List[ComplianceGap], 
+        original_text: str
+    ) -> List[ComplianceFix]:
+        """
+        Generate AI-powered fixes for each compliance gap using Gemini AI.
+        """
+        if not gaps:
+            return []
+        
+        fixes = []
+        for gap in gaps[:5]:  # Limit to 5 fixes to save tokens
+            prompt = f"""
+You are drafting compliant privacy policy text.
+
+ISSUE: {gap.description}
+VIOLATED ARTICLES: {', '.join(gap.ndpr_articles)}
+RECOMMENDATION: {gap.recommendation}
+
+TASK: Write a compliant policy clause that fixes this issue.
+
+FORMAT:
+{{
+  "suggested_text": "Your compliant clause here...",
+  "implementation_steps": ["Step 1", "Step 2"],
+  "effort_level": "low/medium/high"
+}}
+
+Return ONLY JSON.
+"""
+            try:
+                response = await self.gemini.generate_text(prompt, temperature=0.3)
+                json_text = re.sub(r'```json\n?', '', response)
+                json_text = re.sub(r'```\n?', '', json_text)
+                fix_data = json.loads(json_text)
+                
+                fixes.append(ComplianceFix(
+                    gap_id=gap.gap_id,
+                    fix_title=f"Fix for: {gap.title}",
+                    suggested_text=fix_data['suggested_text'],
+                    implementation_steps=fix_data['implementation_steps'],
+                    effort_level=fix_data['effort_level']
+                ))
+            except Exception as e:
+                logger.warning(f"Failed to generate fix for {gap.gap_id}: {str(e)}")
+                continue
+        
+        return fixes
+    
+    def _calculate_risk_level(self, score: int) -> RiskLevel:
+        """
+        Convert compliance score to RiskLevel enum.
+        """
+        if score >= settings.MED_COMPLIANCE_SCORE:
+            return RiskLevel.LOW
+        elif score >= settings.MIN_COMPLIANCE_SCORE:
+            return RiskLevel.MEDIUM
+        elif score >= 50:
+            return RiskLevel.HIGH
+        else:
+            return RiskLevel.CRITICAL
+    
+    def _create_legal_references(self, gaps: List[ComplianceGap]) -> List[LegalReference]:
+        """
+        Generate unique legal references from compliance gaps.
+        """
+        references = []
+        seen_articles = set()
+        
+        for gap in gaps:
+            for article in gap.ndpr_articles:
+                if article not in seen_articles:
+                    seen_articles.add(article)
+                    references.append(LegalReference(
+                        regulation="NDPR",
+                        article=f"Article {article}",
+                        title=self._get_article_title(article),
+                        summary=self._get_article_summary(article),
+                        relevance=f"Violated in: {gap.title}"
+                    ))
+        return references
+    
+    def _get_article_title(self, article: str) -> str:
+        """
+        Get title for NDPR article.
+        """
+        titles = {
+            "2.1": "Lawfulness and Consent",
+            "2.2": "Purpose Limitation",
+            "2.3": "Data Minimization",
+            "2.4": "Storage Limitation",
+            "2.5": "Rights of Data Subjects",
+            "3.1": "Security of Processing",
+            "4.1": "Data Breach Notification"
+        }
+        return titles.get(article, "NDPR Article")
+    
+    def _get_article_summary(self, article: str) -> str:
+        """
+        Get plain language summary of NDPR article.
+        """
+        summaries = {
+            "2.1": "You must get clear permission before collecting personal data",
+            "2.2": "Only use data for the reason you collected it",
+            "2.3": "Only collect data you actually need",
+            "2.4": "Delete data when you no longer need it",
+            "2.5": "People can access, correct, or delete their data",
+            "3.1": "Keep data secure with proper protections",
+            "4.1": "Report data breaches within 72 hours"
+        }
+        return summaries.get(article, "See NDPR for details")
+
+
+# Global singleton instance for LegalAnalyzer
+_legal_analyzer: LegalAnalyzer = None
+
+
+def get_legal_analyzer() -> LegalAnalyzer:
+    """
+    Get or create a singleton instance of LegalAnalyzer.
+    """
+    global _legal_analyzer
+    if _legal_analyzer is None:
+        _legal_analyzer = LegalAnalyzer()
+    return _legal_analyzer

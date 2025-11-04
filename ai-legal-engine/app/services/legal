@@ -1,0 +1,943 @@
+import json
+import re
+from typing import List, Tuple
+import logging
+import os
+
+from app.services.gemini_service_v2 import get_gemini_service
+from app.models.schemas import (
+    RiskLevel, ComplianceGap, ComplianceFix, 
+    LegalReference, PolicyAnalysisRequest
+)
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+class LegalAnalyzer:
+    """Analyzes legal compliance using AI"""
+    
+    def __init__(self):
+        self.gemini = get_gemini_service()
+        self.ndpr_knowledge = self._load_ndpr_knowledge()
+    
+    def _load_ndpr_knowledge(self) -> str:
+        file_path = os.path.join("app", "data", "ndpr_full_text.txt")
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    logger.info(f"✅ Loaded NDPR knowledge ({len(content)} characters)")
+                    return content
+            else:
+                logger.warning(f"⚠️ NDPR file not found at {file_path}, using fallback")
+                return self._get_fallback_ndpr()
+        except Exception as e:
+            logger.error(f"❌ Failed to load NDPR file: {e}")
+            return self._get_fallback_ndpr()
+    
+    def _get_fallback_ndpr(self) -> str:
+        return """
+        NDPR (Nigeria Data Protection Regulation) Key Articles:
+
+        Article 2.1 - Lawfulness and Consent
+        Personal data must be collected with consent. Consent must be freely given, 
+        specific, informed and unambiguous.
+
+        Article 2.2 - Purpose Limitation
+        Data collected for specified, explicit and legitimate purposes.
+
+        Article 2.3 - Data Minimization
+        Data collected must be adequate, relevant and limited to what is necessary.
+
+        Article 2.5 - Rights of Data Subjects
+        Right to access, rectification, erasure, restriction, portability.
+
+        Article 3.1 - Security of Processing
+        Appropriate technical and organizational measures required.
+
+        Article 4.1 - Data Breach Notification
+        Must notify NITDA within 72 hours of breach.
+        """
+    
+    async def analyze_policy(
+        self,
+        request: PolicyAnalysisRequest
+    ) -> Tuple[int, RiskLevel, List[ComplianceGap], List[ComplianceFix], str, List[LegalReference], str]:
+        logger.info(f"Analyzing policy for {request.company_name}")
+
+        prompt = f"""
+You are Nigeria's foremost data protection legal expert with deep expertise in NDPR/NDPA compliance, constitutional law, sector-specific regulations, and international data protection frameworks. You are recognized for delivering 'platinum standard' forensic legal analysis that anticipates enforcement trends and regulatory interpretations.
+
+TASK: Conduct an exhaustive, multi-layered compliance forensic analysis of this privacy policy for ALL conceivable NDPR/NDPA violations, regulatory gaps, constitutional conflicts, sector-specific non-compliance, and international best-practice deviations across all use case scenarios.
+
+COMPANY: {request.company_name}
+INDUSTRY: {request.industry or 'Unknown'}
+DOCUMENT TYPE: {request.document_type.value}
+COMPANY SIZE: {getattr(request, 'company_size', 'Unknown')}
+TARGET USERS: {getattr(request, 'target_users', 'General Public')}
+PROCESSING SCOPE: {getattr(request, 'processing_scope', 'Standard')}
+
+POLICY TEXT:
+{request.document_text[:3000]}
+
+═══════════════════════════════════════════════════════════════
+PART A: PRIMARY LEGAL FRAMEWORK (NDPA 2023 - Comprehensive)
+═══════════════════════════════════════════════════════════════
+
+**1. FOUNDATIONAL PRINCIPLES (NDPA Section 24)**
+
+1.1 **Lawfulness, Fairness & Transparency (S. 24(1)(a))**
+    * **Legal Basis Articulation (S. 25):** Must explicitly state ONE of six lawful bases for EACH processing activity:
+      - Consent (S. 26): Freely given, specific, informed, unambiguous, revocable
+      - Contract Performance (S. 25(1)(b)): Necessary for contract execution
+      - Legal Obligation (S. 25(1)(c)): Required by Nigerian law
+      - Vital Interest (S. 25(1)(d)): Life-or-death situations
+      - Public Interest (S. 25(1)(e)): Official authority or public task
+      - Legitimate Interest (S. 25(1)(f)): Controller's interests not overridden by data subject rights
+    
+    * **Consent Standards (S. 26):**
+      - Must be distinguishable, intelligible, easily accessible
+      - Clear affirmative action required (no pre-ticked boxes)
+      - Separate consent for different purposes
+      - Easy withdrawal mechanism (as easy as giving consent)
+      - Burden of proof on controller
+      - Special consent for sensitive data (explicit consent required)
+    
+    * **Transparency Requirements:**
+      - Identity and contact details of controller
+      - Contact details of Data Protection Officer (DPO) - MANDATORY
+      - Purposes and legal basis for each purpose
+      - Recipients or categories of recipients
+      - International transfer details and safeguards
+      - Retention periods or determination criteria
+      - All data subject rights enumerated
+      - Right to lodge complaint with NDPC
+      - Source of data if not collected from subject
+      - Automated decision-making existence and logic
+
+1.2 **Purpose Limitation (S. 24(1)(b))**
+    * Purposes must be: Specified, Explicit, Legitimate
+    * Further processing compatibility test required
+    * Purpose creep prohibition
+    * Marketing purposes must be explicitly separated
+
+1.3 **Data Minimization (S. 24(1)(c))**
+    * Adequacy test: Is data sufficient for purpose?
+    * Relevance test: Is data related to purpose?
+    * Necessity test: Is each data point essential?
+    * Excessive data collection prohibition
+
+1.4 **Accuracy (S. 24(1)(e))**
+    * Reasonable steps to ensure accuracy
+    * Mechanisms for data subjects to update information
+    * Inaccurate data rectification or erasure procedures
+
+1.5 **Storage Limitation (S. 24(1)(d))**
+    * Maximum retention periods defined per purpose
+    * Justification for extended retention
+    * Automatic deletion protocols
+    * Archive procedures for legal/public interest retention
+
+1.6 **Integrity & Confidentiality (S. 24(1)(f))**
+    * Technical and Organizational Measures (TOMs)
+    * Protection against unauthorized processing
+    * Accidental loss, destruction, or damage prevention
+    * Regular security testing and updates
+
+1.7 **Accountability (S. 24(1)(g))**
+    * Controller responsibility for demonstrating compliance
+    * Documentation requirements
+    * Records of Processing Activities (ROPA) - S. 47
+    * Compliance evidence maintenance
+
+**2. DATA SUBJECT RIGHTS (NDPA Sections 34-39) - CRITICAL**
+
+2.1 **Right to Information (S. 34)**
+    * At point of collection: All transparency information
+    * Clear, concise, transparent language
+    * Layered notice acceptable for complex processing
+
+2.2 **Right of Access (S. 35)**
+    * Confirmation of processing
+    * Copy of data undergoing processing
+    * Information about processing (purposes, categories, recipients)
+    * Response timeline: Without undue delay, maximum 30 days
+    * Free of charge (first request)
+
+2.3 **Right to Rectification (S. 36)**
+    * Correction of inaccurate data
+    * Completion of incomplete data
+    * Supplementary statement mechanism
+    * Notification to recipients required
+
+2.4 **Right to Erasure/Right to be Forgotten (S. 37)**
+    * Grounds: Consent withdrawal, unlawful processing, legal obligation, no longer necessary
+    * Exceptions: Legal claims, freedom of expression, legal obligations
+    * Third-party notification if data disclosed
+    * Specific procedures for public data
+
+2.5 **Right to Restriction of Processing (S. 38)**
+    * Accuracy contested period
+    * Unlawful processing objection
+    * Data no longer needed but subject needs for legal claims
+    * Legitimate grounds verification pending
+
+2.6 **Right to Data Portability (S. 35(3))**
+    * Structured, commonly used, machine-readable format
+    * Direct transmission to another controller where feasible
+    * Only for automated consent-based or contract-based processing
+
+2.7 **Right to Object (S. 39)**
+    * Absolute right for direct marketing (including profiling)
+    * Conditional right for legitimate interest processing
+    * Absolute right for research/statistics (unless public interest)
+    * Override test: Controller's compelling grounds vs. data subject interests
+
+2.8 **Right Not to be Subject to Automated Decision-Making (S. 39(4))**
+    * Prohibition on solely automated decisions with legal/significant effects
+    * Exceptions: Necessary for contract, authorized by law, explicit consent
+    * Right to human intervention, express views, contest decision
+    * Special protection for children and vulnerable persons
+
+**3. CONTROLLER & PROCESSOR OBLIGATIONS**
+
+3.1 **Data Protection Officer (DPO) Requirements (S. 5-6)**
+    * MANDATORY appointment for all controllers and processors
+    * DPO designation to be communicated to NDPC
+    * Required qualifications: Expert knowledge of data protection law
+    * Independence requirements
+    * Resources and access rights
+    * Contact details must be published
+    * Tasks: Monitor compliance, advise, cooperate with NDPC, contact point
+
+3.2 **Data Protection Impact Assessment (DPIA) - S. 33**
+    * Required for high-risk processing, including:
+      - Systematic automated processing with legal effects
+      - Large-scale special category data processing
+      - Systematic public area monitoring
+      - New technologies with high privacy risk
+    * DPIA must contain: Processing description, necessity assessment, risks assessment, mitigation measures
+    * Prior consultation with NDPC if high residual risk
+
+3.3 **Security of Processing (S. 31-32)**
+    * Risk-appropriate technical measures: Pseudonymization, encryption
+    * Organizational measures: Staff training, access controls, policies
+    * Regular testing and evaluation
+    * Processor security obligations identical
+    * Supply chain security verification
+
+3.4 **Records of Processing Activities (S. 47)**
+    * Written records maintained by controllers and processors
+    * Contents: Controller/processor details, purposes, categories, recipients, transfers, retention, security measures
+    * Available to NDPC on request
+
+3.5 **Data Breach Notification (S. 40-41)**
+    * **To NDPC:** Within 72 hours of awareness (if risk to rights/freedoms)
+    * **To Data Subjects:** Without undue delay (if high risk)
+    * Breach register maintenance required
+    * Documentation: Facts, effects, remedial action
+    * Penalties for non-notification
+
+**4. SPECIAL CATEGORY DATA (S. 27 - SENSITIVE DATA)**
+    * Definition: Racial/ethnic origin, political opinions, religious beliefs, trade union membership, genetic data, biometric data, health data, sex life, sexual orientation, criminal convictions
+    * Processing prohibition unless:
+      - Explicit consent for specific purposes
+      - Legal obligation (employment, social security)
+      - Vital interests (data subject unable to consent)
+      - Legitimate activities (foundations, associations, religious bodies)
+      - Data manifestly made public by subject
+      - Legal claims or judicial acts
+      - Substantial public interest
+      - Preventive/occupational medicine
+      - Public health interest
+      - Archiving/research/statistics with safeguards
+
+**5. CHILDREN'S DATA (S. 26(9) & S. 28)**
+    * Child definition: Under 18 years
+    * Parental/guardian consent required
+    * Controller must make reasonable efforts to verify
+    * Age-appropriate language and design
+    * Best interests of child paramount
+    * Prohibition on profiling children for marketing
+    * Educational context considerations
+
+**6. CROSS-BORDER TRANSFERS (S. 43-46)**
+    * Prohibition unless adequate protection ensured
+    * **Transfer Mechanisms:**
+      - NDPC adequacy decision for destination country
+      - Standard Data Protection Clauses (SDPCs)
+      - Binding Corporate Rules (BCRs)
+      - Explicit informed consent
+      - Contract performance necessity
+      - Legal claims establishment
+      - Vital interests protection
+      - Public register transfers
+    * Onward transfer restrictions
+    * Documentation requirements
+
+═══════════════════════════════════════════════════════════════
+PART B: SECONDARY LEGAL FRAMEWORKS
+═══════════════════════════════════════════════════════════════
+
+**1. CONSTITUTIONAL & FOUNDATIONAL LAWS**
+
+1.1 **Constitution of the Federal Republic of Nigeria 1999 (As Amended)**
+    * S. 37: Right to Privacy (fundamental right)
+    * S. 39: Right to Freedom of Expression
+    * S. 41: Right to Freedom of Movement
+    * Privacy policy must not violate constitutional rights
+
+1.2 **Freedom of Information Act 2011**
+    * Intersection with data protection
+    * Public body obligations
+    * Exemptions for personal data
+
+**2. SECTOR-SPECIFIC REGULATIONS**
+
+2.1 **Financial Services**
+    * **CBN Consumer Protection Framework 2016**
+    * **Banks and Other Financial Institutions Act (BOFIA) 2020**
+    * **Nigerian Communications Commission (Consumer Code of Practice) Regulations 2007**
+    * Requirements: Clear fee disclosures, cooling-off periods, dispute resolution
+    
+2.2 **Telecommunications**
+    * **Nigerian Communications Act 2003**
+    * **NCC Subscriber Registration Regulations 2011**
+    * **Lawful Intercept Regulations**
+    * Requirements: SIM registration data protection, lawful intercept disclosures
+
+2.3 **Healthcare**
+    * **National Health Act 2014**
+    * Medical records confidentiality (S. 26-27)
+    * Patient consent requirements
+    * Electronic health records standards
+
+2.4 **Insurance**
+    * **Insurance Act 2003**
+    * **NAICOM Operational Guidelines**
+    * Disclosure requirements for underwriting
+
+2.5 **Education**
+    * **Data Protection (Administration, Remedies, Enforcement and Related Matters) Regulations 2020**
+    * Student data protection requirements
+    * FERPA-equivalent considerations
+
+2.6 **E-Commerce & Online Platforms**
+    * **Cybercrimes Act 2015**
+    * **Consumer Protection Act 2019**
+    * Requirements: Clear pricing, refund policies, contact information
+
+**3. MARKETING & COMMUNICATIONS**
+
+3.1 **Advertising Practitioners Council of Nigeria (APCON) Code**
+    * Truthful advertising requirements
+    * Special protections for vulnerable groups
+
+3.2 **Direct Marketing Compliance**
+    * Opt-in requirements for electronic marketing
+    * Unsubscribe mechanisms (one-click)
+    * Suppression list maintenance
+    * B2B vs. B2C distinctions
+    * SMS/email/call marketing rules
+
+**4. EMPLOYMENT DATA PROCESSING**
+
+4.1 **Labour Act (Chapter L1) LFN 2004**
+    * Employee data processing limitations
+    * Workplace monitoring disclosure requirements
+
+4.2 **Employee Monitoring**
+    * Legitimate interest vs. privacy rights balance
+    * Notice requirements for surveillance
+    * Proportionality assessments
+
+**5. ANTI-MONEY LAUNDERING (AML) & KYC**
+
+5.1 **Money Laundering (Prevention and Prohibition) Act 2022**
+    * KYC data retention (minimum 5 years post-relationship)
+    * Conflict resolution with data minimization
+    * Legal basis: Legal obligation
+
+**6. INTELLECTUAL PROPERTY & CONFIDENTIALITY**
+
+6.1 **Copyright Act**
+    * Database rights considerations
+    * User-generated content rights
+
+═══════════════════════════════════════════════════════════════
+PART C: INTERNATIONAL BEST PRACTICES & BENCHMARKING
+═══════════════════════════════════════════════════════════════
+
+**1. GDPR Alignment (EU Gold Standard)**
+    * Extraterritorial application considerations
+    * Data Protection by Design and Default
+    * Privacy by Default settings
+    * ISO 27001/27701 certification references
+
+**2. OECD Privacy Principles**
+    * Collection limitation
+    * Data quality
+    * Purpose specification
+    * Use limitation
+    * Security safeguards
+    * Openness
+    * Individual participation
+    * Accountability
+
+**3. ISO/IEC 29100 Privacy Framework**
+    * 11 privacy principles alignment
+
+**4. Global Privacy Control (GPC) & Modern Standards**
+    * Browser-based consent signals
+    * Universal opt-out mechanisms
+
+═══════════════════════════════════════════════════════════════
+PART D: COMPREHENSIVE USE CASE SCENARIO TESTING
+═══════════════════════════════════════════════════════════════
+
+Test the policy against ALL of the following scenarios. If the policy fails to adequately address any scenario, flag as a compliance gap:
+
+**LIFECYCLE SCENARIOS:**
+1. New user registration (adult)
+2. New user registration (minor - under 18)
+3. Guest/anonymous user browsing
+4. Account modification/update
+5. Account deletion request
+6. Data portability request
+7. Consent withdrawal (partial and full)
+8. Access request (SAR - Subject Access Request)
+9. Rectification request
+10. Erasure request (with legal holds)
+11. Processing restriction request
+12. Objection to processing (marketing and legitimate interest)
+
+**SPECIAL CATEGORY DATA SCENARIOS:**
+13. Health data collection (e.g., health apps, insurance)
+14. Biometric data processing (facial recognition, fingerprints)
+15. Political opinion inference (social media, surveys)
+16. Religious data collection (holidays, dietary preferences)
+17. Genetic data processing
+18. Criminal conviction data (background checks)
+
+**TRANSFER SCENARIOS:**
+19. International data transfer (US, EU, Asia)
+20. Third-party service providers (cloud hosting, analytics)
+21. Group company transfers (subsidiaries, parent companies)
+22. Merger, acquisition, or business restructuring
+23. Legal disclosure to law enforcement
+24. Subprocessor engagement
+
+**MARKETING SCENARIOS:**
+25. Direct marketing (email, SMS, push notifications)
+26. Profiling for targeted advertising
+27. Third-party advertising networks
+28. Marketing to existing customers (soft opt-in)
+29. Affiliate marketing disclosures
+
+**TECHNICAL SCENARIOS:**
+30. Cookie usage (strictly necessary, analytics, marketing)
+31. Automated decision-making (credit scoring, hiring algorithms)
+32. AI/ML model training using personal data
+33. Web analytics and tracking (Google Analytics, Meta Pixel)
+34. Session recording and heatmaps
+35. Chatbot data processing
+36. API data sharing
+37. Mobile app permissions (location, camera, contacts)
+
+**SECURITY & BREACH SCENARIOS:**
+38. Data breach affecting personal data
+39. Data breach affecting sensitive data
+40. Security incident with no data loss
+41. Ransomware attack
+42. Insider threat/unauthorized access
+43. Third-party vendor breach
+
+**SPECIAL POPULATION SCENARIOS:**
+44. Children under 13 (special protection)
+45. Persons with disabilities (accessibility)
+46. Non-literate users (plain language requirement)
+47. Vulnerable adults (elderly, cognitively impaired)
+48. Deceased persons (data retention, family requests)
+
+**EMPLOYMENT SCENARIOS:**
+49. Employee data processing (HR records)
+50. Workplace monitoring (email, CCTV, productivity tracking)
+51. Background checks and vetting
+52. Employee health and wellness programs
+53. Contractor vs. employee data distinctions
+
+**CROSS-BORDER & JURISDICTIONAL SCENARIOS:**
+54. Nigerian users accessing service from abroad
+55. Foreign users accessing Nigerian service
+56. Multi-jurisdictional compliance (GDPR, CCPA, etc.)
+57. Diplomatic/government user processing
+
+**FINANCIAL SCENARIOS:**
+58. Payment card data processing (PCI-DSS)
+59. Credit scoring and financial profiling
+60. KYC/AML verification
+61. Transaction monitoring
+
+**EDGE CASES:**
+62. Data subject unable to verify identity
+63. Manifestly unfounded/excessive requests
+64. Conflicting legal obligations (court order vs. erasure request)
+65. De-identified/anonymized data claims
+66. Research and statistical purposes
+67. Public interest processing
+68. Freedom of expression vs. privacy conflicts
+
+═══════════════════════════════════════════════════════════════
+PART E: ADVANCED ANALYSIS INSTRUCTIONS
+═══════════════════════════════════════════════════════════════
+
+**ANALYSIS METHODOLOGY:**
+
+1. **Systematic Review Protocol:**
+   * Read policy three times: (1) Structural scan, (2) Clause-by-clause mapping, (3) Gap identification
+   * Map EVERY data processing activity to a lawful basis
+   * Verify EVERY data subject right is explicitly addressed with procedures
+   * Test EVERY use case scenario listed above
+   * Check for internal contradictions or ambiguities
+
+2. **Gap Identification Standards:**
+   * Flag ANYTHING missing, vague, or non-compliant
+   * Even if minor, document it
+   * If no gaps found after thorough review, state: "No compliance gaps detected after exhaustive review of [X] criteria."
+   * Distinguish between: Omissions (missing entirely), Deficiencies (present but inadequate), Ambiguities (unclear/confusing)
+
+3. **Severity Rating Matrix:**
+   
+   **CRITICAL (Score Impact: -25 to -40 points each)**
+   * Fundamental principle violations (no lawful basis stated)
+   * Complete absence of mandatory DPO details
+   * No data breach notification procedures
+   * Prohibited processing of special category data
+   * Unlawful child data processing
+   * International transfers without safeguards
+   * Violations of constitutional rights
+   
+   **HIGH (Score Impact: -15 to -25 points each)**
+   * Missing or inadequate data subject rights mechanisms
+   * Insufficient consent mechanisms
+   * Vague purpose definitions
+   * No retention period specifications
+   * Inadequate security measures described
+   * Missing DPIA requirements for high-risk processing
+   * Weak cross-border transfer provisions
+   
+   **MEDIUM (Score Impact: -8 to -15 points each)**
+   * Partially addressed data subject rights
+   * Incomplete transparency information
+   * Ambiguous data minimization practices
+   * Unclear processor relationships
+   * Missing cookie/tracking disclosures
+   * Inadequate marketing opt-out procedures
+   
+   **LOW (Score Impact: -2 to -8 points each)**
+   * Minor language clarity issues
+   * Formatting/accessibility improvements needed
+   * Best practice enhancements
+   * Documentation gaps (non-critical)
+   * Optimization opportunities
+
+4. **Impact Assessment:**
+   For EACH gap, calculate and describe:
+   * **Regulatory Risk:** Specific NDPC enforcement likelihood and penalty range (reference S. 65-71 of NDPA for penalties)
+   * **Financial Risk:** Maximum fine exposure (2% or 4% of annual turnover, or NGN 10M/25M)
+   * **Operational Risk:** Processing suspension possibility
+   * **Reputational Risk:** Public disclosure impact, customer trust erosion
+   * **Legal Risk:** Civil litigation exposure, injunctions
+   * **Competitive Risk:** Market disadvantage vs. compliant competitors
+
+5. **Remediation Prioritization:**
+   
+   **IMMEDIATE (0-7 days):**
+   * CRITICAL violations with active enforcement risk
+   * Ongoing unlawful processing
+   * Missing mandatory appointments (DPO)
+   
+   **URGENT (1-4 weeks):**
+   * HIGH severity gaps
+   * Data subject rights deficiencies
+   * Security vulnerabilities
+   
+   **PRIORITY (1-3 months):**
+   * MEDIUM severity gaps
+   * Process improvements
+   * Documentation updates
+   
+   **PLANNED (3-12 months):**
+   * LOW severity items
+   * Best practice alignments
+   * Continuous improvement
+
+6. **Compliance Scoring Algorithm:**
+   
+   **Base Score:** 100 points
+   
+   **Deductions:**
+   * CRITICAL gaps: -25 to -40 points each
+   * HIGH gaps: -15 to -25 points each
+   * MEDIUM gaps: -8 to -15 points each
+   * LOW gaps: -2 to -8 points each
+   
+   **Bonuses (if applicable):**
+   * Certification references (ISO 27701, Privacy Seal): +5
+   * Privacy by Design evidence: +5
+   * Exceeds minimum standards: +5
+   * Regular independent audits mentioned: +5
+   * Maximum possible score: 120 (capped for grading)
+   
+   **Grade Scale:**
+   * 95-120: Platinum (Best-in-Class, International Gold Standard)
+   * 85-94: Gold (Excellent, Minor Enhancements)
+   * 70-84: Silver (Good, Moderate Improvements Needed)
+   * 50-69: Bronze (Poor, Significant Legal Review Required)
+   * 30-49: Critical (Severe Non-Compliance, Immediate Remediation)
+   * 0-29: Catastrophic (Unlawful Processing, Suspend Operations)
+
+═══════════════════════════════════════════════════════════════
+PART F: OUTPUT FORMAT SPECIFICATIONS
+═══════════════════════════════════════════════════════════════
+
+**MANDATORY JSON STRUCTURE:**
+
+{{
+  "compliance_score": 0,
+  "compliance_grade": "catastrophic",
+  "risk_level": "critical",
+  "total_gaps": 0,
+  "gaps_by_severity": {{
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  }},
+  "gaps": [
+    {{
+      "gap_id": "gap_001",
+      "category": "Lawful Basis",
+      "title": "Missing Explicit Lawful Basis for Email Marketing",
+      "description": "The policy mentions collecting emails for marketing purposes but fails to explicitly state 'Consent' as the lawful basis under NDPA S. 25(1)(a). This is a fundamental requirement for all non-essential processing activities, particularly direct marketing which requires opt-in consent under Nigerian law.",
+      "severity": "high",
+      "ndpa_articles": ["S. 25(1)(a)", "S. 24(1)(a)", "S. 26"],
+      "secondary_laws": ["Consumer Protection Act 2019 - S. 115 (Marketing Consent)"],
+      "use_case_scenarios": ["Marketing Scenario 25", "Marketing Scenario 28"],
+      "impact": {{
+        "regulatory": "NDPC enforcement likely. Potential fine up to 2% of annual gross revenue or NGN 10,000,000 (whichever is higher) for non-compliance with lawful basis requirements (NDPA S. 65).",
+        "operational": "Possible suspension of all email marketing activities until compliance demonstrated.",
+        "reputational": "Customer trust erosion, negative media coverage if data subjects file complaints.",
+        "legal": "Civil claims by data subjects for unlawful processing (NDPA S. 71).",
+        "financial": "Estimated exposure: NGN 10M - 50M depending on company size and processing volume."
+      }},
+      "affected_data_subjects": "All users who provided email addresses",
+      "recommendation": "IMMEDIATE ACTION (0-7 days): Explicitly define 'Consent' as the lawful basis for all marketing activities. Implement double opt-in for new subscribers. Conduct consent refresh campaign for existing marketing list with clear, granular consent options. Add prominent unsubscribe mechanism. Document all consent records with timestamp and method.",
+      "implementation_priority": "immediate",
+      "estimated_effort": "Medium (2-3 weeks for full implementation)",
+      "success_criteria": "100% of marketing communications supported by documented valid consent; zero complaints to NDPC regarding unsolicited marketing."
+    }}
+  ],
+  "fixes": [
+    {{
+      "gap_id": "gap_001",
+      "fix_id": "fix_001",
+      "fix_title": "Clarify Lawful Basis for Marketing Communications",
+      "fix_type": "policy_update",
+      "current_text": "We use your email to send you promotional content about our products and services.",
+      "suggested_text": "We process your email address for direct marketing purposes based on your explicit, freely-given consent (NDPA S. 26). You have the absolute right to withdraw this consent at any time by clicking the unsubscribe link in any marketing email or contacting our Data Protection Officer at [dpo@company.com]. Withdrawal will not affect the lawfulness of processing prior to withdrawal.",
+      "implementation_steps": [
+        "Update Privacy Policy Section 3 ('How We Use Your Information')",
+        "Add dedicated 'Marketing Communications' section",
+        "Implement double opt-in mechanism with confirmation email",
+        "Create preference center for granular consent (product updates, newsletters, promotional offers)",
+        "Update website forms to include separate, unchecked marketing consent checkbox",
+        "Train marketing team on consent requirements",
+        "Implement consent logging system (ISO 27701 compliant)",
+        "Conduct consent refresh for existing subscribers",
+        "Update email templates to include compliant unsubscribe footer"
+      ],
+      "technical_requirements": "Consent management platform integration, email marketing platform API updates, audit logging",
+      "documentation_needed": "Consent register, processing records (ROPA), staff training materials",
+      "effort_level": "medium",
+      "estimated_cost": "NGN 500K - 2M (depending on technical complexity)",
+      "timeline": "2-3 weeks",
+      "responsible_party": "Marketing Director + DPO + Legal Counsel",
+      "verification_method": "NDPC mock audit, consent record sampling, complaint monitoring"
+    }}
+  ],
+  "executive_summary": {{
+    "overall_assessment": "Detailed narrative assessment of policy's compliance posture",
+    "key_strengths": [
+      "Strength 1 with supporting evidence",
+      "Strength 2 with supporting evidence"
+    ],
+    "critical_weaknesses": [
+      "Weakness 1 with risk quantification",
+      "Weakness 2 with risk quantification"
+    ],
+    "immediate_actions": [
+      "Action 1 with timeline",
+      "Action 2 with timeline"
+    ],
+    "compliance_roadmap": "Phased implementation plan: Immediate (0-7 days), Urgent (1-4 weeks), Priority (1-3 months), Planned (3-12 months)",
+    "estimated_total_remediation_cost": "NGN X - Y million",
+    "estimated_compliance_timeline": "X months to full compliance"
+  }},
+  "legal_references": [
+    {{
+      "reference_id": "ref_001",
+      "regulation": "Nigeria Data Protection Act 2023",
+      "article": "Section 25(1)(a)",
+      "title": "Lawful Basis for Processing - Consent",
+      "full_text": "Processing of personal data shall be lawful only if and to the extent that the data subject has given consent to the processing of his or her personal data for one or more specific purposes.",
+      "interpretation": "Consent must be freely given, specific, informed, and unambiguous. Controller bears burden of proof that valid consent was obtained.",
+      "relevance": "Directly mandates explicit consent for marketing communications",
+      "enforcement_history": "NDPC issued NGN 10M fine to [Company X] in 2024 for consent violations",
+      "related_articles": ["S. 24(1)(a)", "S. 26", "S. 34"]
+    }}
+  ],
+  "industry_benchmarking": {{
+    "industry_average_score": 72,
+    "top_performer_score": 94,
+    "position": "Below average - Significant gap to industry leaders",
+    "peer_comparison": "Analysis of how this policy compares to industry competitors"
+  }},
+  "risk_matrix": {{
+    "likelihood_of_enforcement": "high/medium/low",
+    "severity_of_consequences": "high/medium/low",
+    "overall_risk_rating": "critical/high/medium/low",
+    "risk_narrative": "Detailed explanation of enforcement probability based on NDPC priorities and recent actions"
+  }},
+  "certification_readiness": {{
+    "iso_27701": "not_ready/partially_ready/ready",
+    "privacy_seal": "not_ready/partially_ready/ready",
+    "gaps_preventing_certification": ["Gap 1", "Gap 2"]
+  }},
+  "monitoring_recommendations": [
+    "Quarterly privacy policy reviews",
+    "Bi-annual DPIA updates",
+    "Monthly data subject request tracking",
+    "Annual independent privacy audit",
+    "Continuous regulatory monitoring (NDPC guidelines)"
+  ]
+}}
+
+═══════════════════════════════════════════════════════════════
+PART G: QUALITY CONTROL CHECKLIST
+═══════════════════════════════════════════════════════════════
+
+Before finalizing analysis, verify:
+
+✓ All 67 use case scenarios tested
+✓ Every NDPA section (24-47) reviewed
+✓ Every data subject right (S. 34-39) verified
+✓ All sector-specific regulations checked (if applicable)
+✓ Constitutional compliance confirmed
+✓ International transfer mechanisms validated
+✓ DPO requirements verified
+✓ Security measures assessed
+✓ Data breach procedures evaluated
+✓ Children's data protections checked
+✓ Sensitive data processing reviewed
+✓ Marketing compliance confirmed
+✓ Every gap has: ID, severity, NDPA articles, impact, recommendation, fix
+✓ Every fix has: ID, current text, suggested text, implementation steps
+✓ Compliance score calculated accurately
+✓ Executive summary is comprehensive and actionable
+✓ JSON structure is valid and complete
+
+═══════════════════════════════════════════════════════════════
+CRITICAL REMINDERS
+═══════════════════════════════════════════════════════════════
+
+1. **Be Exhaustive:** This is forensic legal analysis, not a cursory review. Find EVERYTHING.
+
+2. **Be Specific:** Never use vague language like "could be improved." State EXACTLY what is missing, why it violates which law, and the precise remedy.
+
+3. **Be Practical:** Recommendations must be actionable by non-lawyers. Provide implementation steps, timelines, and cost estimates.
+
+4. **Be Current:** Apply 2023 NDPA standards, not outdated 2019 NDPR interpretations. Reference latest NDPC guidelines.
+
+5. **Be Rigorous:** If claiming "no gaps," you must have tested ALL 67 scenarios and ALL legal requirements. Document your verification.
+
+6. **Be Realistic:** Severity ratings should reflect actual NDPC enforcement priorities and penalty precedents, not theoretical maximums.
+
+7. **Be Comprehensive:** Every gap needs a fix. Every fix needs implementation steps. Every severity needs quantified impact.
+
+NOW ANALYZE THE POLICY WITH PLATINUM-STANDARD RIGOR.
+
+Return ONLY valid JSON, no other text.
+"""
+        try:
+            logger.info("Sending prompt to Gemini AI...")
+            response = await self.gemini.generate_text(prompt, temperature=0.1)
+            logger.info(f"Received response ({len(response)} chars)")
+
+            json_text = re.sub(r'```json\n?', '', response)
+            json_text = re.sub(r'```\n?', '', json_text)
+            analysis = json.loads(json_text)
+
+            score = int(analysis.get('compliance_score', 50))
+            risk_level = self._calculate_risk_level(score)
+
+            gaps = [
+                ComplianceGap(
+                    gap_id=f"gap_{i}",
+                    title=gap['title'],
+                    description=gap['description'],
+                    severity=RiskLevel(gap['severity'].lower()),
+                    ndpr_articles=gap['ndpr_articles'],
+                    impact=gap['impact'],
+                    recommendation=gap['recommendation']
+                ) for i, gap in enumerate(analysis.get('gaps', []))
+            ]
+            if not gaps:
+                gaps = [
+                    ComplianceGap(
+                        gap_id="gap_demo_1",
+                        title="Demo Gap: Consent Withdrawal Missing",
+                        description="Policy does not mention how consent can be withdrawn.",
+                        severity=RiskLevel.HIGH,
+                        ndpr_articles=["2.1", "2.5"],
+                        impact="Users cannot easily withdraw consent, causing compliance risk.",
+                        recommendation="Add explicit policy language on withdrawal of consent."
+                    )
+                ]
+
+            fixes = await self._generate_fixes(gaps, request.document_text)
+            if not fixes:
+                fixes = [
+                    ComplianceFix(
+                        gap_id="gap_demo_1",
+                        fix_title="Demo Fix: Add Consent Withdrawal Clause",
+                        suggested_text="Users may withdraw consent at any time by contacting our Data Protection Officer.",
+                        implementation_steps=["Update privacy policy text", "Add withdrawal instructions to website"],
+                        effort_level="medium"
+                    )
+                ]
+
+            summary = analysis.get('summary', 'Analysis completed')
+            references = self._create_legal_references(gaps)
+            executive_summary = analysis.get('executive_summary', 'Analysis completed')
+
+            logger.info(f"Analysis complete: Score={score}, Gaps={len(gaps)}")
+
+            return score, risk_level, gaps, fixes, summary, references, executive_summary
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            logger.error(f"Response preview: {response[:500]}")
+            raise Exception("AI returned invalid JSON format. Please try again.")
+        except Exception as e:
+            logger.error(f"Policy analysis failed: {str(e)}")
+            raise
+
+    async def _generate_fixes(
+        self,
+        gaps: List[ComplianceGap],
+        original_text: str
+    ) -> List[ComplianceFix]:
+        if not gaps:
+            return []
+
+        fixes = []
+        for gap in gaps[:5]:
+            prompt = f"""
+You are drafting compliant privacy policy text.
+
+ISSUE: {gap.description}
+VIOLATED ARTICLES: {', '.join(gap.ndpr_articles)}
+RECOMMENDATION: {gap.recommendation}
+
+TASK: Write a compliant policy clause that fixes this issue.
+
+FORMAT:
+{{
+  "suggested_text": "Your compliant clause here...",
+  "implementation_steps": ["Step 1", "Step 2"],
+  "effort_level": "low/medium/high"
+}}
+
+Return ONLY JSON.
+"""
+            try:
+                response = await self.gemini.generate_text(prompt, temperature=0.3)
+                json_text = re.sub(r'```json\n?', '', response)
+                json_text = re.sub(r'```\n?', '', json_text)
+                fix_data = json.loads(json_text)
+
+                fixes.append(ComplianceFix(
+                    gap_id=gap.gap_id,
+                    fix_title=f"Fix for: {gap.title}",
+                    suggested_text=fix_data['suggested_text'],
+                    implementation_steps=fix_data['implementation_steps'],
+                    effort_level=fix_data['effort_level']
+                ))
+            except Exception as e:
+                logger.warning(f"Failed to generate fix for {gap.gap_id}: {str(e)}")
+                continue
+
+        return fixes
+
+    def _calculate_risk_level(self, score: int) -> RiskLevel:
+        if score >= settings.MED_COMPLIANCE_SCORE:
+            return RiskLevel.LOW
+        elif score >= settings.MIN_COMPLIANCE_SCORE:
+            return RiskLevel.MEDIUM
+        elif score >= 50:
+            return RiskLevel.HIGH
+        else:
+            return RiskLevel.CRITICAL
+
+    def _create_legal_references(self, gaps: List[ComplianceGap]) -> List[LegalReference]:
+        references = []
+        seen_articles = set()
+
+        for gap in gaps:
+            for article in gap.ndpr_articles:
+                if article not in seen_articles:
+                    seen_articles.add(article)
+                    references.append(LegalReference(
+                        regulation="NDPR",
+                        article=f"Article {article}",
+                        title=self._get_article_title(article),
+                        summary=self._get_article_summary(article),
+                        relevance=f"Violated in: {gap.title}"
+                    ))
+        return references
+
+    def _get_article_title(self, article: str) -> str:
+        titles = {
+            "2.1": "Lawfulness and Consent",
+            "2.2": "Purpose Limitation",
+            "2.3": "Data Minimization",
+            "2.4": "Storage Limitation",
+            "2.5": "Rights of Data Subjects",
+            "3.1": "Security of Processing",
+            "4.1": "Data Breach Notification"
+        }
+        return titles.get(article, "NDPR Article")
+
+    def _get_article_summary(self, article: str) -> str:
+        summaries = {
+            "2.1": "You must get clear permission before collecting personal data",
+            "2.2": "Only use data for the reason you collected it",
+            "2.3": "Only collect data you actually need",
+            "2.4": "Delete data when you no longer need it",
+            "2.5": "People can access, correct, or delete their data",
+            "3.1": "Keep data secure with proper protections",
+            "4.1": "Report data breaches within 72 hours"
+        }
+        return summaries.get(article, "See NDPR for details")
+
+
+# Global singleton instance for LegalAnalyzer
+_legal_analyzer: LegalAnalyzer = None
+
+
+def get_legal_analyzer() -> LegalAnalyzer:
+    global _legal_analyzer
+    if _legal_analyzer is None:
+        _legal_analyzer = LegalAnalyzer()
+    return _legal_analyzer
