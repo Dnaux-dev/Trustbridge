@@ -1,0 +1,94 @@
+{
+  "info": {
+    "name": "TrustBridge FastAPI",
+    "_postman_id": "trustbridge-fastapi-collection",
+    "description": "Collection to test TrustBridge FastAPI endpoints: register, token, recordAction, getLedger.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "internal_token", "value": "internal-secret-token", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Register User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Alice Citizen\",\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\",\n  \"role\": \"citizen\",\n  \"company\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/registerUser",
+          "host": ["{{baseUrl}}"],
+          "path": ["registerUser"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Record Action",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"revoke_consent\",\n  \"details\": { \"text\": \"I withdraw my consent for marketing emails\" },\n  \"companyId\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/recordAction",
+          "host": ["{{baseUrl}}"],
+          "path": ["recordAction"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Ledger (admin)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/getLedger",
+          "host": ["{{baseUrl}}"],
+          "path": ["getLedger"]
+        }
+      },
+      "response": []
+    }
+  ]
+}
