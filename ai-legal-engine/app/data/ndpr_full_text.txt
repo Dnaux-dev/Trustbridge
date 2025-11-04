@@ -1,0 +1,212 @@
+NIGERIA DATA PROTECTION ACT, 2023
+EXPLANATORY MEMORANDUM
+This Act provides a legal framework for the protection of personal information and establishes the Nigeria Data Protection Commission for the regulation of the processing of personal information.
+NIGERIA DATA PROTECTION ACT, 2023
+Arrangement of Sections
+Section:
+PART I — OBJECTIVES AND APPLICATION
+
+Objectives
+
+Application
+
+Exemption of application
+PART II — ESTABLISHMENT OF THE NIGERIA DATA PROTECTION COMMISSION, AND ITS GOVERNING COUNCIL
+
+Establishment of the Nigeria Data Protection Commission
+
+Functions of the Commission
+
+Powers of the Commission
+
+Independence of the Commission
+
+Establishment of the Governing Council of the Commission
+
+Appointment of members of the Council
+
+Tenure of members of the Council
+
+Cessation of membership
+
+Functions and powers of the Council
+
+Conflict of interest
+PART III — APPOINTMENT OF THE NATIONAL COMMISSIONER, AND OTHER STAFF OF THE COMMISSION
+
+Appointment of the National Commissioner for the Commission
+
+Secretary to the Council
+
+Staff of the Commission
+
+Staff regulations and discipline
+
+Pension
+PART IV — FINANCIAL PROVISIONS
+
+Funds of the Commission
+
+Expenditure of the Fund
+
+Power to borrow and accept gifts
+
+Accounts and audit
+
+Annual reports and estimates
+PART V — PRINCIPLES AND LAWFUL BASIS GOVERNING PROCESSING OF PERSONAL DATA
+
+Principles of personal data processing
+
+Lawful basis for personal data processing
+
+Consent
+
+Provision of information to the data subject
+
+Data privacy impact assessment
+
+Obligations of the data controller and data processor
+
+Sensitive personal data
+
+Children or persons lacking the legal capacity to consent
+
+Data Protection Officers
+
+Data protection compliance services
+PART VI — RIGHTS OF A DATA SUBJECT
+
+Rights of a data subject
+
+Withdrawal of consent
+
+Right to object
+
+Automated decision making
+
+Data portability
+PART VII — DATA SECURITY
+
+Security, integrity, and confidentiality
+
+Personal data breaches
+PART VIII — CROSS-BORDER TRANSFERS OF PERSONAL DATA
+
+Basis for cross-border transfer of personal data
+
+Adequacy of protection
+
+Other bases for transfer of personal data outside Nigeria
+PART IX — REGISTRATION AND FEES
+
+Registration of data controllers and data processors of major importance
+
+Fees and levies
+PART X — ENFORCEMENT
+
+Complaints and investigations
+
+Compliance orders
+
+Enforcement orders
+
+Offences and penalties
+
+Judicial review
+
+Civil remedies
+
+Forfeiture
+
+Joint and vicarious liability
+PART XI — LEGAL PROCEEDINGS
+
+Limitation of suits against the Commission
+
+Service of documents
+
+Restriction on execution against property of the Commission
+
+Indemnity of staff, members, and employees of the Commission
+
+Power of arrest, search, and seizure
+
+Right to appear in court
+PART XII — MISCELLANEOUS PROVISIONS
+
+Directives by the Minister
+
+Regulations
+
+Directives, codes, and guidelines
+
+Priority of the Act
+
+Transitional provisions
+
+Interpretation
+
+Citation
+Schedule
+NIGERIA DATA PROTECTION ACT, 2023
+A Bill
+An Act to provide a legal framework for the protection of personal information, and establish the Nigeria Data Protection Commission for the regulation of the processing of personal information; and for related matters.1
+
+Commencement
+ENACTED by the National Assembly of the Federal Republic of Nigeria —
+PART I — OBJECTIVES AND APPLICATION
+
+Objectives
+The objectives of this Act are to:
+(a) safeguard the fundamental rights and freedoms, and the interests of data subjects, as guaranteed under the Constitution of the Federal Republic of Nigeria, 1999;
+(b) provide for the regulation of processing of personal data;
+(c) promote data processing practices that safeguard the security of personal data and privacy of data subjects;
+(d) ensure that personal data is processed in a fair, just and accountable manner;
+(e) protect data subjects' rights, and provide means of recourse and remedies, in the event of the breach of the data subject's rights;2
+(f) ensure that data controllers and data processors fulfil their obligations to data subjects;3
+(g) establish an impartial, independent, and effective regulatory Commission to superintend over data protection and privacy4 issues, and supervise data controllers and data processors; and
+(h) strengthen the legal foundations of the national digital economy and guarantee the participation of Nigeria in the regional and global economies through the beneficial and trusted use of personal data.5
+
+Application6
+(1) This Act shall apply to the processing of personal data, whether by automated means or not.7
+(2) This Act shall apply, where the —89
+(a) data controller or data processor is domiciled in, resident in, 10or operating in Nigeria;11
+(b) processing of personal data occurs within Nigeria; or12
+(c) the data controller or the data processor is not domiciled in, resident in, or operating in Nigeria, but is processing pe13rsonal data of a data subject in Nigeria.
+
+Exemption of application
+(1) This Act shall not apply to the processing of personal data carried out by one or more persons solely for personal or household purposes:
+
+
+        Provided that such processing for personal or household purposes does not constitute a violation of fundamental right to privacy of a data subject.
+
+
+(2) Subject to the rights and freedoms under the Constitution and the limitations, the obligations under Part V (other than 14sections 24, 25, 32, and 40 of this Act), shall not apply to a data controller or data processor if the processing of personal data is15 —
+(a) carried out by a competent authority for the purposes of the prevention, investigation, detection, prosecution, or adjudication of a criminal offence or the execution of a criminal penalty, in accordance with any applicable law;
+(b) carried out by a competent authority for the purposes of prevention or control of a national public health emergency;
+(c) carried out by a competent authority, as is necessary for national security;
+(d) in respect of publication in the public interest, for journalism, educational, artistic and literary purposes to the extent that such obligations and rights are incompatible with such purposes; or
+(e) necessary for the establishment, exercise, or defense of legal claims, whether in court proceedings or in an administrative or out-of-court procedure.
+(3) The Commission may by regulation prescribe types of personal data and processing may be exempted from application of this Act.
+(4) Notwithstanding the provisions of this Act, the Commission may issue a guidance notice containing legal safeguards and best practices to a data controller or processor, in respect of any aspect of data processing exempted under this section where in the opinion of the Commission, such processing violates or is likely to violate sections 24 and 25 of this Act.
+PART II — ESTABLISHMENT OF THE NIGERIA DATA PROTECTION COMMISSION, AND ITS GOVERNING COUNCIL
+
+Establishment of the Nigeria Data Protection Commission
+(1) There is established the Nigeria Data Protection Commission (in this Act, referred to as “the Commission”).
+(2) The Commission —
+(a) shall be a body corporate, with perpetual succession and a common seal;
+(b) may sue or be sued in its corporate name; and
+(c) may acquire, hold and dispose of its property.
+(3) The regulations made under this Act may —
+[The rest of this section is incomplete in the provided text.]
+CERTIFICATION AND ASSENT
+I certify that this Bill has been carefully compared by me with the decision reached by the National Assembly and found by me to be true and correct decision of the Houses and is in accordance with the provisions of the Acts Authentication Act Ca16p. A2, Laws of the Federation of Nigeria, 2004.
+
+(Signed)
+SALISU A. TAMBAWAL, fcna
+Clerk to the National Assembly
+I ASSENT.
+BOLA AHMED TINUBU, GCFR
+President of the Federal Republic of Nigeria
+.. Day of .., 20..
