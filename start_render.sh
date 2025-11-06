@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # Small launcher for Render that binds to 0.0.0.0 and uses the $PORT env var
 set -euo pipefail
 

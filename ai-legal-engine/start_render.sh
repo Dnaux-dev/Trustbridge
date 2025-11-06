@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # Launcher for Render when service root is fastapi/ai-legal-engine
 set -euo pipefail
 
