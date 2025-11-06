@@ -1,9 +1,40 @@
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
+## Merged requirements for TrustBridge (backend + AI-Legal Engine)
+## NOTE: This project standardizes on Pydantic v2 for the ai-legal-engine
+
+# FastAPI + ASGI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# MongoDB async client
 # motor 4.x not published on PyPI; pin to a recent 3.x release compatible with Motor API
 motor==3.7.1
+
+# Security & auth
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-pydantic==1.10.11
+
+# Pydantic v2 + settings
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Validation helpers
 email-validator==1.3.1
+
+# dotenv for loading .env files
 python-dotenv==1.0.0
+
+# AI-Legal-Engine specific packages
+google-generativeai==0.3.1
+
+# Document processing
+pypdf==3.17.1
+python-docx==1.1.0
+python-multipart==0.0.6
+
+# Text processing
+nltk==3.8.1
+
+# HTTP client & utilities
+httpx==0.25.2
+tenacity==8.2.3
+

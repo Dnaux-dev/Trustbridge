@@ -17,11 +17,13 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Install dependencies:
+2. Install dependencies (merged for backend + AI-Legal Engine):
 
 ```bash
 pip install -r requirements.txt
 ```
+
+Note: This repository now standardizes on Pydantic v2. If you encounter issues, ensure your virtualenv is fresh and you're using Python 3.11.
 
 3. Run the app:
 
