@@ -108,3 +108,19 @@ If you want, I can also:
 
 ---
 Change log: created on 2025-11-06 to document two-service Render deployment and security recommendations.
+
+
+Important Render Python runtime note
+----------------------------------
+The error you pasted (pydantic-core trying to compile with maturin/cargo) typically happens when Render builds with a newer Python version (for which prebuilt pydantic-core wheels don't exist) or when the build environment lacks write access to Cargo's cache.
+
+To avoid this, pick a Python runtime that has prebuilt wheels for `pydantic-core` (we recommend Python 3.11). There are two ways to ensure Render uses Python 3.11 for the `fastapi` service:
+
+1. Ensure `runtime.txt` is present in the service root (we include `fastapi/runtime.txt` with `python-3.11.4`). Render reads this when your service root directory is set correctly (root = `fastapi`).
+
+2. Explicitly set the Python version in the Render service settings to `Python 3.11` (Render Dashboard → Service → Environment → Runtime). This overrides autodetection and prevents Render from using Python 3.13.
+
+After making the change, trigger a fresh deploy and clear the build cache to force a clean build (Render UI: Manual Deploy → Clear Cache & Deploy). That should stop pip from trying to build `pydantic-core` from source.
+
+If you cannot use Python 3.11 for any reason, the alternative is to provide a Dockerfile with a build image that includes Rust and maturin so pydantic-core can compile; this is more involved and I can help if needed.
+
