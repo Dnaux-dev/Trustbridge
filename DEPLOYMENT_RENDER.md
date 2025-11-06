@@ -8,10 +8,19 @@ Summary (what you'll create on Render)
 - Service B: trustbridge-ai-engine (root: `fastapi/ai-legal-engine`) — AI legal engine
 
 Start commands
-- Service A (main backend):
-  uvicorn app.main:app --host 0.0.0.0 --port 8000
-- Service B (AI engine):
-  uvicorn app.main:app --host 0.0.0.0 --port 8001
+- Important: Render injects a runtime $PORT environment variable and expects your service to bind to 0.0.0.0 and that port. Do NOT use Uvicorn's default 127.0.0.1 binding.
+
+- Recommended start command (use this in the Render service settings):
+  uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level info
+
+- If you use the `ai-legal-engine` service root, set its start command to:
+  uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level info
+
+- Development note: do not use `--reload` on Render — it's intended for local development and can cause the process to bind only to localhost (127.0.0.1) under some configurations.
+
+Optional helper script
+- You can also use a small launcher script (included in the repo) and set the Render start command to `./start_render.sh`. The script respects `PORT` and defaults to 8000 if not set.
+
 
 Health checks
 - AI engine: use `/api/v1/health` (returns JSON status)
