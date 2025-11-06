@@ -4,6 +4,9 @@ __pycache__/
 *.sqlite3
 *.log
 .env
+
+ai-legal-engine/.env
+ai-legal-engine/.venv
 /.mypy_cache
 .pytest_cache/
 .DS_Store
