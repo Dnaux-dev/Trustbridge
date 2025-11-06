@@ -1,4 +1,5 @@
 ## Merged requirements for TrustBridge (backend + AI-Legal Engine)
+--only-binary=pydantic-core
 ## NOTE: This project standardizes on Pydantic v2 for the ai-legal-engine
 
 # FastAPI + ASGI
