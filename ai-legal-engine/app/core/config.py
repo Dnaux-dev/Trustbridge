@@ -65,6 +65,11 @@ class Settings(BaseSettings):
         "http://localhost:3000,http://localhost:8000", 
         description="Comma-separated list of allowed CORS origins"
     )
+    # Allow all origins (use with caution in production). If True, CORS will allow '*'.
+    ALLOW_ALL_ORIGINS: bool = Field(
+        False,
+        description="If true, allow CORS from any origin ('*'). Use only when necessary."
+    )
 
     # Compliance Scoring Thresholds
     MIN_COMPLIANCE_SCORE: int = Field(

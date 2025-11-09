@@ -44,6 +44,11 @@ Service B — trustbridge-ai-engine (fastapi/ai-legal-engine)
 - LOG_LEVEL = INFO
 - ENVIRONMENT = production
 
+Security & CORS note
+- If you want the AI engine to accept requests from any origin (useful for testing or public demos), set:
+  - ALLOW_ALL_ORIGINS=true
+  This will configure FastAPI to use allow_origins=['*'] for CORS. Use this only if you understand the security tradeoffs. In production it's safer to set `ALLOWED_ORIGINS` to a comma-separated list of allowed origins.
+
 Security note: pick a single long random secret and set both `INTERNAL_TOKEN` (Service A) and `API_SECRET_KEY` (Service B) to that same value — then instruct Service B to validate incoming `X-Internal-Token` headers against `API_SECRET_KEY` (see optional code snippet below). This secures the inter-service calls.
 
 Render-specific steps (UI)

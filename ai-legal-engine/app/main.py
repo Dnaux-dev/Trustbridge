@@ -115,9 +115,11 @@ async def ai_service_error_handler(request: Request, exc: AIServiceError):
 
 
 # CORS Middleware
+# If ALLOW_ALL_ORIGINS is set, allow '*' for CORS. Otherwise use the configured list.
+cors_origins = ["*"] if getattr(settings, 'ALLOW_ALL_ORIGINS', False) else settings.allowed_origins_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins_list,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
