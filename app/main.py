@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .db import connect, close
 from . import db as db_module
-from .schemas import UserCreate, Token, UserOut, Company, ActionIn, AIResult, LedgerEntryOut
+from .schemas import UserCreate, Token, UserOut, Company, ActionIn, AIResult, LedgerEntryOut, RecordActionResponse, ActionOut
 from .auth import get_password_hash, verify_password, create_access_token, get_current_user, require_role, internal_only
 from .ai import analyze_action
 from bson import ObjectId
@@ -47,7 +47,7 @@ def oid(id_str):
         return None
 
 
-@app.post('/registerUser', response_model=UserOut)
+@app.post('/registerUser', response_model=UserOut, summary="Register a new user")
 async def register_user(payload: UserCreate):
     # check existing
     existing = await db_module.db['users'].find_one({'email': payload.email})
@@ -66,8 +66,8 @@ async def register_user(payload: UserCreate):
     return UserOut(id=user_doc['id'], name=user_doc['name'], email=user_doc['email'], role=user_doc['role'], company=user_doc.get('company'))
 
 
-@app.post('/login', response_model=Token)
-async def login(form: dict):
+@app.post('/login', response_model=Token, summary="Login and receive a JWT token")
+async def login(form: dict = Body(..., example={"email":"alice@example.com","password":"sup3rsecret"})):
     # accept JSON {"email":"..","password":".."}
     email = form.get('email')
     password = form.get('password')
@@ -82,12 +82,12 @@ async def login(form: dict):
     return {'access_token': token, 'token_type': 'bearer'}
 
 
-@app.get('/users/me')
+@app.get('/users/me', response_model=UserOut, summary="Get current authenticated user")
 async def users_me(user: dict = Depends(get_current_user)):
-    return {'id': str(user['_id']), 'name': user['name'], 'email': user['email'], 'role': user['role'], 'company': user.get('company')}
+    return UserOut(id=str(user['_id']), name=user['name'], email=user['email'], role=user['role'], company=user.get('company'))
 
 
-@app.get('/users/{user_id}/ledger')
+@app.get('/users/{user_id}/ledger', response_model=list[LedgerEntryOut], summary="Get ledger entries for a user")
 async def user_ledger(user_id: str, current: dict = Depends(get_current_user)):
     # allow self, admin, or business
     if current.get('role') != 'admin' and str(current.get('_id')) != user_id and current.get('role') != 'business':
@@ -104,26 +104,24 @@ async def user_ledger(user_id: str, current: dict = Depends(get_current_user)):
     return entries
 
 
-@app.get('/companies')
+@app.get('/companies', response_model=list[Company], summary="List companies")
 async def list_companies(user: dict = Depends(get_current_user)):
     out = []
     async for c in db_module.db['companies'].find():
-        c['id'] = str(c['_id'])
-        out.append(c)
+        out.append(Company(id=str(c['_id']), name=c.get('name'), description=c.get('description'), contactEmail=c.get('contactEmail'), policies=c.get('policies')))
     return out
 
 
-@app.get('/companies/{company_id}')
+@app.get('/companies/{company_id}', response_model=Company, summary="Get a single company")
 async def get_company(company_id: str, user: dict = Depends(get_current_user)):
     c = await db_module.db['companies'].find_one({'_id': oid(company_id)})
     if not c:
         raise HTTPException(status_code=404, detail='Company not found')
-    c['id'] = str(c['_id'])
-    return c
+    return Company(id=str(c['_id']), name=c.get('name'), description=c.get('description'), contactEmail=c.get('contactEmail'), policies=c.get('policies'))
 
 
-@app.post('/companies/{company_id}/consent')
-async def company_consent(company_id: str, payload: dict, user: dict = Depends(require_role('citizen'))):
+@app.post('/companies/{company_id}/consent', response_model=RecordActionResponse, summary="Grant or revoke consent for a company (citizen only)")
+async def company_consent(company_id: str, payload: dict = Body(..., example={"action":"revoke","details":{"reason":"no longer using service"}}), user: dict = Depends(require_role('citizen'))):
     # expect { action: 'grant' | 'revoke', details: {} }
     action = payload.get('action')
     if action not in ('grant', 'revoke'):
@@ -150,11 +148,11 @@ async def company_consent(company_id: str, payload: dict, user: dict = Depends(r
         'raw': {'source': 'consent_endpoint', 'payload': payload}
     }
     await db_module.db['ledger'].insert_one(ledger_doc)
-    return {'action': str(res.inserted_id), 'ai': ai}
+    return RecordActionResponse(actionId=str(res.inserted_id), ai=ai)
 
 
-@app.post('/company/audit')
-async def company_audit(payload: dict, user: dict = Depends(require_role('business'))):
+@app.post('/company/audit', response_model=AIResult, summary="Run a company policy audit (business only)")
+async def company_audit(payload: dict = Body(..., example={"policyText":"Our privacy policy says..."}), user: dict = Depends(require_role('business'))):
     # business user must have company
     company_id = user.get('company')
     if not company_id:
@@ -185,7 +183,7 @@ async def company_audit(payload: dict, user: dict = Depends(require_role('busine
     return ai
 
 
-@app.post('/recordAction')
+@app.post('/recordAction', response_model=RecordActionResponse, summary="Record a user action (citizen or business)")
 async def record_action(payload: ActionIn, user: dict = Depends(require_role('citizen', 'business'))):
     # call AI analyzer
     ai = await analyze_action(payload.type, payload.companyId, payload.details)
@@ -209,11 +207,11 @@ async def record_action(payload: ActionIn, user: dict = Depends(require_role('ci
         'raw': {'request': payload.dict()}
     }
     await db_module.db['ledger'].insert_one(ledger_doc)
-    return {'actionId': str(res.inserted_id), 'ai': ai}
+    return RecordActionResponse(actionId=str(res.inserted_id), ai=ai)
 
 
-@app.post('/ai/analyzeAction')
-async def ai_analyze(payload: dict, _=Depends(internal_only)):
+@app.post('/ai/analyzeAction', response_model=AIResult, summary="Internal AI analysis endpoint (internal token required)")
+async def ai_analyze(payload: dict = Body(..., example={"user_action":"revoke_consent","company_id":"5f8d0d55","details":{"text":"Please delete my data"}}), _=Depends(internal_only)):
     # internal endpoint protected by header X-Internal-Token
     user_action = payload.get('user_action')
     company_id = payload.get('company_id')
@@ -222,7 +220,7 @@ async def ai_analyze(payload: dict, _=Depends(internal_only)):
     return ai
 
 
-@app.get('/getLedger')
+@app.get('/getLedger', response_model=list[LedgerEntryOut], summary="Get the full ledger (admin only)")
 async def get_ledger(current: dict = Depends(get_current_user)):
     # admin only
     if current.get('role') != 'admin':
@@ -237,22 +235,19 @@ async def get_ledger(current: dict = Depends(get_current_user)):
     return out
 
 
-@app.get('/actions')
+@app.get('/actions', response_model=list[ActionOut], summary="List actions (admin only)")
 async def get_actions(current: dict = Depends(get_current_user)):
     if current.get('role') != 'admin':
         raise HTTPException(status_code=403, detail='Admin only')
-    out = []
+    out: list[ActionOut] = []
     cursor = db_module.db['actions'].find().sort('createdAt', -1)
     async for doc in cursor:
-        doc['id'] = str(doc['_id'])
-        doc['actor'] = str(doc['actor']) if doc.get('actor') else None
-        doc['company'] = str(doc['company']) if doc.get('company') else None
-        out.append(doc)
+        out.append(ActionOut(id=str(doc.get('_id')), actor=str(doc.get('actor')) if doc.get('actor') else None, actorRole=doc.get('actorRole'), type=doc.get('type'), details=doc.get('details'), company=str(doc.get('company')) if doc.get('company') else None, createdAt=doc.get('createdAt')))
     return out
 
 
-@app.post('/ledger/append')
-async def ledger_append(payload: dict, current: dict = Depends(get_current_user), x_internal_token: str = Header(None)):
+@app.post('/ledger/append', response_model=dict, summary="Append a raw document to the ledger (admin or internal token)")
+async def ledger_append(payload: dict = Body(...), current: dict = Depends(get_current_user), x_internal_token: str = Header(None)):
     # allow admin or internal token
     if current.get('role') != 'admin' and x_internal_token != None:
         # if no admin, require internal token
