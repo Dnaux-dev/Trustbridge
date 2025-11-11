@@ -64,7 +64,6 @@ async def global_exception_handler(request: Request, exc: Exception):
     """
     import traceback, sys
     traceback.print_exc()
-    # Echo the Origin header when present so browsers accept the response when credentials are used
     # Use wildcard origin so responses are accepted from any frontend origin.
     headers = {
         'Access-Control-Allow-Origin': '*',
@@ -72,8 +71,16 @@ async def global_exception_handler(request: Request, exc: Exception):
         'Access-Control-Allow-Methods': '*',
         'Access-Control-Allow-Headers': '*'
     }
+    # In DEBUG mode, include the exception message to help debugging (development only).
+    from .config import DEBUG as _DEBUG
+    detail = 'Internal Server Error'
+    if _DEBUG:
+        try:
+            detail = f"{exc.__class__.__name__}: {str(exc)}"
+        except Exception:
+            detail = 'Internal Server Error'
     # Return a JSON 500 with the CORS headers set so the browser receives it
-    return JSONResponse(status_code=500, content={'detail': 'Internal Server Error'}, headers=headers)
+    return JSONResponse(status_code=500, content={'detail': detail}, headers=headers)
 
 
 def oid(id_str):
@@ -86,7 +93,7 @@ def oid(id_str):
 @app.post('/registerUser', response_model=UserOut, summary="Register a new user")
 async def register_user(payload: UserCreate):
     # Ensure DB is connected
-    if not getattr(db_module, 'db', None):
+    if getattr(db_module, 'db', None) is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Database not available')
     try:
         # check existing
@@ -108,10 +115,11 @@ async def register_user(payload: UserCreate):
         # Re-raise expected HTTPExceptions
         raise
     except Exception as e:
-        # Log and return a clear server error
+        # Log and return a clear server error (include error text for debugging)
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to create user')
+        # Include the exception message in the HTTP response detail to aid debugging.
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Failed to create user: {str(e)}')
 
 
 @app.post('/login', response_model=Token, summary="Login and receive a JWT token")

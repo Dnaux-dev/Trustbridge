@@ -10,3 +10,4 @@ ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 INTERNAL_TOKEN = os.getenv('INTERNAL_TOKEN', 'internal-secret-token')
 ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', '')  # comma-separated list; if empty, allow wildcard without credentials
+DEBUG = os.getenv('DEBUG', 'false').lower() in ('1', 'true', 'yes')

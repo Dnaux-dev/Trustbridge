@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional, List, Any
 from datetime import datetime
 
 class UserCreate(BaseModel):
     """Payload to create a new user."""
     name: str = Field(..., description="Full name of the user", example="Alice Doe")
-    email: EmailStr = Field(..., description="User email address", example="alice@example.com")
+    email: str = Field(..., description="User email address", example="alice@example.com")
     password: str = Field(..., description="Plain-text password (will be hashed)", example="sup3rsecret")
     role: Optional[str] = Field('citizen', description="Role (citizen, business, admin)", example="citizen")
     company: Optional[str] = Field(None, description="Optional company id if the user belongs to a company", example=None)
@@ -18,7 +18,7 @@ class Token(BaseModel):
 class UserOut(BaseModel):
     id: str = Field(..., description="User id", example="6532f1a...")
     name: str = Field(..., description="Full name", example="Alice Doe")
-    email: EmailStr = Field(..., description="Email address", example="alice@example.com")
+    email: str = Field(..., description="Email address", example="alice@example.com")
     role: str = Field(..., description="Role", example="citizen")
     company: Optional[str] = Field(None, description="Company id if any", example=None)
 
@@ -26,7 +26,7 @@ class Company(BaseModel):
     id: Optional[str] = Field(None, description="Company id", example="5f8d0d55")
     name: str = Field(..., description="Company name", example="Acme Ltd")
     description: Optional[str] = Field(None, description="Short description of the company", example="Payments startup")
-    contactEmail: Optional[EmailStr] = Field(None, description="Contact email", example="dpo@acme.example")
+    contactEmail: Optional[str] = Field(None, description="Contact email", example="dpo@acme.example")
     policies: Optional[str] = Field(None, description="Policy text or URL", example="https://acme.example/privacy")
 
 class ActionIn(BaseModel):
