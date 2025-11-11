@@ -11,16 +11,28 @@ import datetime
 
 app = FastAPI(title='TrustBridge FastAPI Backend')
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],
-    # Allow any origin for broad frontend compatibility. Do NOT enable credentials when using '*'.
-    # If you need credentialed requests (cookies), replace '*' with an explicit origin list and
-    # set allow_credentials=True.
-    allow_credentials=False,
-    allow_methods=['*'],
-    allow_headers=['*']
-)
+# Configure CORS depending on ALLOWED_ORIGINS environment variable.
+# If ALLOWED_ORIGINS is set (comma-separated), use that explicit list and enable credentials
+# which is required for cookie-based auth. If not set, fall back to wildcard origins and
+# disable credentials (browser-compatible but disallows cookies).
+from .config import ALLOWED_ORIGINS as _ALLOWED_ORIGINS
+if _ALLOWED_ORIGINS and _ALLOWED_ORIGINS.strip():
+    _origins = [o.strip() for o in _ALLOWED_ORIGINS.split(',') if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*']
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=['*'],
+        allow_credentials=False,
+        allow_methods=['*'],
+        allow_headers=['*']
+    )
 
 
 @app.on_event('startup')
@@ -73,21 +85,33 @@ def oid(id_str):
 
 @app.post('/registerUser', response_model=UserOut, summary="Register a new user")
 async def register_user(payload: UserCreate):
-    # check existing
-    existing = await db_module.db['users'].find_one({'email': payload.email})
-    if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Email already registered')
-    pwd = get_password_hash(payload.password)
-    user_doc = {
-        'name': payload.name,
-        'email': payload.email,
-        'password': pwd,
-        'role': payload.role,
-        'company': payload.company
-    }
-    result = await db_module.db['users'].insert_one(user_doc)
-    user_doc['id'] = str(result.inserted_id)
-    return UserOut(id=user_doc['id'], name=user_doc['name'], email=user_doc['email'], role=user_doc['role'], company=user_doc.get('company'))
+    # Ensure DB is connected
+    if not getattr(db_module, 'db', None):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Database not available')
+    try:
+        # check existing
+        existing = await db_module.db['users'].find_one({'email': payload.email})
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Email already registered')
+        pwd = get_password_hash(payload.password)
+        user_doc = {
+            'name': payload.name,
+            'email': payload.email,
+            'password': pwd,
+            'role': payload.role,
+            'company': payload.company
+        }
+        result = await db_module.db['users'].insert_one(user_doc)
+        user_doc['id'] = str(result.inserted_id)
+        return UserOut(id=user_doc['id'], name=user_doc['name'], email=user_doc['email'], role=user_doc['role'], company=user_doc.get('company'))
+    except HTTPException:
+        # Re-raise expected HTTPExceptions
+        raise
+    except Exception as e:
+        # Log and return a clear server error
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Failed to create user')
 
 
 @app.post('/login', response_model=Token, summary="Login and receive a JWT token")
