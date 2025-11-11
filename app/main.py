@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Header, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Body, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .db import connect, close
@@ -14,7 +14,10 @@ app = FastAPI(title='TrustBridge FastAPI Backend')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
-    allow_credentials=True,
+    # Allow any origin for broad frontend compatibility. Do NOT enable credentials when using '*'.
+    # If you need credentialed requests (cookies), replace '*' with an explicit origin list and
+    # set allow_credentials=True.
+    allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*']
 )
@@ -38,6 +41,27 @@ async def startup_db():
 @app.on_event('shutdown')
 async def shutdown_db():
     close()
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler that ensures responses include CORS headers.
+
+    This helps the browser show the underlying error instead of a silent CORS block
+    when an internal server error occurs (for example, DB connection failures).
+    """
+    import traceback, sys
+    traceback.print_exc()
+    # Echo the Origin header when present so browsers accept the response when credentials are used
+    # Use wildcard origin so responses are accepted from any frontend origin.
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': 'false',
+        'Access-Control-Allow-Methods': '*',
+        'Access-Control-Allow-Headers': '*'
+    }
+    # Return a JSON 500 with the CORS headers set so the browser receives it
+    return JSONResponse(status_code=500, content={'detail': 'Internal Server Error'}, headers=headers)
 
 
 def oid(id_str):
